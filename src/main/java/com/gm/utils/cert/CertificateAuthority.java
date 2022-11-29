@@ -6,7 +6,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.Security;
+import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.text.MessageFormat;
 import java.time.Duration;
@@ -49,82 +49,88 @@ public class CertificateAuthority {
     @Value("${certs.org-prefix:localhost}")
     private String org;
 
-    static {
-        Security.addProvider(new BouncyCastleProvider());
-    }
-
-    public X509Certificate createRootCaCertificate(KeyPair keyPair, int expiryInDays) throws Exception {
+    public X509Certificate createRootCaCertificate(KeyPair keyPair, int expiryInDays) {
         final Instant now = Instant.now();
         final Date notBefore = Date.from(now);
         final Date notAfter = Date.from(now.plus(Duration.ofDays(expiryInDays)));
 
-        ContentSigner rootCertContentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGORITHM).setProvider(BouncyCastleProvider.PROVIDER_NAME)
-                .build(keyPair.getPrivate());
+        try {
+            ContentSigner rootCertContentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGORITHM).setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                    .build(keyPair.getPrivate());
 
-        X500Name x500Name = new X500Name(MessageFormat.format(CA_X500_NAME_FMT, org));
+            X500Name x500Name = new X500Name(MessageFormat.format(CA_X500_NAME_FMT, org));
 
-        // @formatter:off
-        X509v3CertificateBuilder rootCertBuilder = new JcaX509v3CertificateBuilder(x500Name,
-                getSerialNumber(),
-                notBefore,
-                notAfter,
-                x500Name,
-                keyPair.getPublic());
-        // @formatter:on
+            // @formatter:off
+            X509v3CertificateBuilder rootCertBuilder = new JcaX509v3CertificateBuilder(x500Name,
+                    getSerialNumber(),
+                    notBefore,
+                    notAfter,
+                    x500Name,
+                    keyPair.getPublic());
+            // @formatter:on
 
-        JcaX509ExtensionUtils rootCertExtUtils = new JcaX509ExtensionUtils();
-        rootCertBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
-        rootCertBuilder.addExtension(Extension.keyUsage, true, new X509KeyUsage(X509KeyUsage.keyCertSign | X509KeyUsage.cRLSign));
-        rootCertBuilder.addExtension(Extension.subjectKeyIdentifier, false, rootCertExtUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
+            JcaX509ExtensionUtils rootCertExtUtils = new JcaX509ExtensionUtils();
+            rootCertBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+            rootCertBuilder.addExtension(Extension.keyUsage, true, new X509KeyUsage(X509KeyUsage.keyCertSign | X509KeyUsage.cRLSign));
+            rootCertBuilder.addExtension(Extension.subjectKeyIdentifier, false, rootCertExtUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
 
-        // Create a cert holder and export to X509Certificate
-        X509CertificateHolder rootCertHolder = rootCertBuilder.build(rootCertContentSigner);
-        X509Certificate cert = new JcaX509CertificateConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getCertificate(rootCertHolder);
-        cert.verify(keyPair.getPublic());
-        return cert;
+            // Create a cert holder and export to X509Certificate
+            X509CertificateHolder rootCertHolder = rootCertBuilder.build(rootCertContentSigner);
+            X509Certificate cert = new JcaX509CertificateConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getCertificate(rootCertHolder);
+            cert.verify(keyPair.getPublic());
+            return cert;
+        } catch (Exception e) {
+            throw new CertificateCreationException("Unable to create Certificate", e);
+        }
     }
 
     private BigInteger getSerialNumber() {
         return BigInteger.valueOf(Instant.now().toEpochMilli());
     }
 
-    public X509Certificate createIntermediateRootCa(X509Certificate issuer, KeyPair keyPair, PrivateKey caKey, int expiryInDays) throws Exception {
+    public X509Certificate createIntermediateRootCa(X509Certificate issuer, KeyPair keyPair, PrivateKey caKey, int expiryInDays) {
         final Instant now = Instant.now();
         final Date notBefore = Date.from(now);
         final Date notAfter = Date.from(now.plus(Duration.ofDays(expiryInDays)));
 
-        // set issuer and subject name
-        X500Name issuedToCN = new X500Name(MessageFormat.format(CA_X500_NAME_FMT, org.concat("-Intermediate")));
+        try {
+            // set issuer and subject name
+            X500Name issuedToCN = new X500Name(MessageFormat.format(CA_X500_NAME_FMT, org.concat("-Intermediate")));
 
-        X509v3CertificateBuilder intermediateCertBuilder = new JcaX509v3CertificateBuilder(issuer, getSerialNumber(), notBefore, notAfter, issuedToCN,
-                keyPair.getPublic());
+            X509v3CertificateBuilder intermediateCertBuilder = new JcaX509v3CertificateBuilder(issuer, getSerialNumber(), notBefore, notAfter,
+                    issuedToCN, keyPair.getPublic());
 
-        JcaX509ExtensionUtils intermediateCertExtUtils = new JcaX509ExtensionUtils();
+            JcaX509ExtensionUtils intermediateCertExtUtils = new JcaX509ExtensionUtils();
 
-        // Configure the extensions
-        intermediateCertBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
-        intermediateCertBuilder.addExtension(Extension.keyUsage, true, new X509KeyUsage(
-                X509KeyUsage.keyCertSign | X509KeyUsage.digitalSignature | X509KeyUsage.dataEncipherment | X509KeyUsage.keyAgreement));
-        intermediateCertBuilder.addExtension(Extension.subjectKeyIdentifier, false,
-                intermediateCertExtUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
-        intermediateCertBuilder.addExtension(Extension.extendedKeyUsage, true, new ExtendedKeyUsage(KeyPurposeId.anyExtendedKeyUsage));
-        intermediateCertBuilder.addExtension(Extension.authorityKeyIdentifier, false, intermediateCertExtUtils.createAuthorityKeyIdentifier(issuer));
+            // Configure the extensions
+            intermediateCertBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
+            intermediateCertBuilder.addExtension(Extension.keyUsage, true, new X509KeyUsage(
+                    X509KeyUsage.keyCertSign | X509KeyUsage.digitalSignature | X509KeyUsage.dataEncipherment | X509KeyUsage.keyAgreement));
+            intermediateCertBuilder.addExtension(Extension.subjectKeyIdentifier, false,
+                    intermediateCertExtUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
+            intermediateCertBuilder.addExtension(Extension.extendedKeyUsage, true, new ExtendedKeyUsage(KeyPurposeId.anyExtendedKeyUsage));
+            intermediateCertBuilder.addExtension(Extension.authorityKeyIdentifier, false,
+                    intermediateCertExtUtils.createAuthorityKeyIdentifier(issuer));
 
-        ContentSigner contentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGORITHM).setProvider(BouncyCastleProvider.PROVIDER_NAME).build(caKey);
-        X509CertificateHolder certHldr = intermediateCertBuilder.build(contentSigner);
-        X509Certificate cert = new JcaX509CertificateConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getCertificate(certHldr);
+            ContentSigner contentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGORITHM).setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                    .build(caKey);
+            X509CertificateHolder certHldr = intermediateCertBuilder.build(contentSigner);
+            X509Certificate cert = new JcaX509CertificateConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getCertificate(certHldr);
 
-        cert.verify(issuer.getPublicKey());
+            cert.verify(issuer.getPublicKey());
 
-        return cert;
+            return cert;
+        } catch (Exception e) {
+            throw new CertificateCreationException("Failed to create Intermediate Root CA", e);
+        }
     }
 
-    public PKCS10CertificationRequest createCsr(String commonName, KeyPair keyPair, KeyPair issuer) {
+    public PKCS10CertificationRequest createCsr(String commonName, PublicKey publicKey, PrivateKey issuerPrivateKey) {
         try {
             X500Name localCertCsrName = new X500Name(MessageFormat.format(LOCAL_CERT_X500_FMT, commonName));
-            PKCS10CertificationRequestBuilder p10Builder = new JcaPKCS10CertificationRequestBuilder(localCertCsrName, keyPair.getPublic());
+            PKCS10CertificationRequestBuilder p10Builder = new JcaPKCS10CertificationRequestBuilder(localCertCsrName, publicKey);
             JcaContentSignerBuilder csrBuilder = new JcaContentSignerBuilder(SIGNATURE_ALGORITHM).setProvider(BouncyCastleProvider.PROVIDER_NAME);
-            ContentSigner signer = csrBuilder.build(issuer.getPrivate());
+            ContentSigner signer = csrBuilder.build(issuerPrivateKey);
             return p10Builder.build(signer);
         } catch (OperatorCreationException e) {
             throw new CsrCreationException("Unable to create CSR Request", e);
