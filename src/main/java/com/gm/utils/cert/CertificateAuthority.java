@@ -44,8 +44,8 @@ import com.gm.utils.cert.exception.CsrCreationException;
 
 public class CertificateAuthority {
     private static final String SIGNATURE_ALGORITHM = "SHA256withRSA";
-    private static final String CA_X500_NAME_FMT = "E=support@{0},CN={0}-RootCA,OU=IT,O=ITDelivery,L=Pune,ST=MH,C=IN";
-    private static final String LOCAL_CERT_X500_FMT = "C=IN,ST=MH,L=Pune,O=ITDelivery,OU=IT,CN={0},E=support@{0}";
+    private static final String CA_X500_NAME_FMT = "CN={0}-RootCA,O=ITDelivery,C=IN";
+    private static final String LOCAL_CERT_X500_FMT = "CN={0},C=IN,ST=MH,L=Pune,O=ITDelivery,OU=IT,E=support@{0}";
     @Value("${certs.org-prefix:localhost}")
     private String org;
 
@@ -172,16 +172,16 @@ public class CertificateAuthority {
     private DERSequence getSubjectAltnativeNames(String commonName) {
         List<ASN1Encodable> sanEntries = new ArrayList<>(10);
 
-        sanEntries.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost.com"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.localhost.com"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.accounts.intern"));
         sanEntries.add(new GeneralName(GeneralName.dNSName, commonName));
-
         if (commonName.indexOf("accounts.intern") == -1) {
             sanEntries.add(new GeneralName(GeneralName.dNSName, commonName.concat(".accounts.intern")));
         }
+        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.accounts.intern"));
+        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost"));
+        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost.com"));
+        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.localhost.com"));
+        sanEntries.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
+
         return new DERSequence(sanEntries.toArray(new ASN1Encodable[sanEntries.size()]));
     }
 
