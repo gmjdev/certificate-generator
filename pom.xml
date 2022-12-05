@@ -36,10 +36,15 @@
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk18on</artifactId>
+      <artifactId>bcprov-jdk18on</artifactId>
       <version>${bc.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <version>${bc.version}</version>
+    </dependency>
+    <!--     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcutil-jdk18on</artifactId>
       <version>${bc.version}</version>
@@ -48,7 +53,7 @@
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-ext-jdk18on</artifactId>
       <version>${bc.version}</version>
-    </dependency>
+    </dependency>-->
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>

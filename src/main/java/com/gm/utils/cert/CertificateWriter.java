@@ -13,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -39,7 +40,7 @@ public class CertificateWriter {
         return CertificateWriterHolder.instance;
     }
 
-    public void writeToPem(Certificate certificate, String filePath) throws IOException {
+    public void toPEM(X509Certificate certificate, String filePath) throws IOException {
         log.debug("Writing certificate to file: {}", filePath);
         StringWriter stringWriter = new StringWriter();
         try (JcaPEMWriter pemWriter = new JcaPEMWriter(stringWriter)) {

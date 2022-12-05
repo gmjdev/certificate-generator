@@ -32,11 +32,11 @@ import com.gm.utils.cert.util.SystemUtil;
 
 @SpringBootApplication
 public class CertUtilApplication {
+    private static final int DEFAULT_KEYSIZE = 2048;
     private static final String INTERMEDIATE_ROOT_CA_PFX_FILE_NAME = "intermediateRootCa.pfx";
     private static final String ROOT_CA_PFX_FILE_NAME = "rootCa.pfx";
     @Autowired
     private CertificateAuthority authority;
-    private static final String KEY_ALGORITHM = "RSA";
     @Value("${certs.org-prefix:localhost}")
     private String org;
     @Value("${certs.phrase:changeit}")
@@ -65,10 +65,10 @@ public class CertUtilApplication {
 
         try {
             LOG.info("RootCA Keystore file does not exists creating new RootCA Authority.");
-            KeyPair rootCaKp = authority.generateKeyPair(KEY_ALGORITHM, 2048);
+            KeyPair rootCaKp = KeyPairGeneratorUtil.generateBcRsaKeyPair(DEFAULT_KEYSIZE);
             X509Certificate rootCaCert = authority.createRootCaCertificate(rootCaKp, 365 * 10);
             CertificateWriter.getInstance().writePrivateKeyToPem(rootCaKp, new File(directory, "rootCa.key").getPath(), phrase);
-            CertificateWriter.getInstance().writeToPem(rootCaCert, new File(directory, "rootCa.cer").getPath());
+            CertificateWriter.getInstance().toPEM(rootCaCert, new File(directory, "rootCa.cer").getPath());
             CertificateWriter.getInstance().writeToPkcs12Keystore(rootCaKp, new Certificate[] { rootCaCert }, org.concat("RootCA"),
                     rootCaPfx.getPath(), phrase);
         } catch (Exception e) {
@@ -87,10 +87,10 @@ public class CertUtilApplication {
             Assert.notNull(issuerKey, "Issuer PrivateKey is null");
             Assert.notNull(issuerCertificate, "Issuer Certificate is null");
             LOG.info("IntermediateRootCA Keystore file does not exists creating new IntermediateRootCA Authority.");
-            KeyPair intermediatKp = authority.generateKeyPair(KEY_ALGORITHM, 2048);
+            KeyPair intermediatKp = KeyPairGeneratorUtil.generateBcRsaKeyPair(DEFAULT_KEYSIZE);
             X509Certificate intermediateRootCaCert = authority.createIntermediateRootCa(issuerCertificate[0], intermediatKp, issuerKey, 365 * 5);
             CertificateWriter.getInstance().writePrivateKeyToPem(intermediatKp, new File(directory, "intermediateRootCa.key").getPath(), phrase);
-            CertificateWriter.getInstance().writeToPem(intermediateRootCaCert, new File(directory, "intermediateRootCa.cer").getPath());
+            CertificateWriter.getInstance().toPEM(intermediateRootCaCert, new File(directory, "intermediateRootCa.cer").getPath());
             X509Certificate[] chain = ArrayUtils.addAll(new X509Certificate[] { intermediateRootCaCert }, issuerCertificate);
             CertificateWriter.getInstance().writeToPkcs12Keystore(intermediatKp, chain, org.concat("IntermediateRootCA"),
                     intermediatRootCaPfx.getPath(), phrase);
@@ -110,15 +110,15 @@ public class CertUtilApplication {
         try {
             LOG.warn("Creating Certificate for Hostname: {}", issuedTo);
 
-            KeyPair issuedCertificateKp = authority.generateKeyPair(KEY_ALGORITHM, 2048);
-            PKCS10CertificationRequest csrRequest = authority.createCsr(issuedTo, issuedCertificateKp.getPublic(), issuerKey);
+            KeyPair issuedCertificateKp = KeyPairGeneratorUtil.generateBcRsaKeyPair(DEFAULT_KEYSIZE);
+            PKCS10CertificationRequest csrRequest = authority.createCsr(issuedTo, issuedCertificateKp, "SHA256withRSA");
             if (null == csrRequest) {
                 throw new CertificateCreationException("No valid CSR exists");
             }
             CertificateWriter.getInstance().writePrivateKeyToPem(issuedCertificateKp, new File(directory, issuedTo.concat(".key")).getPath(), phrase);
             CertificateWriter.getInstance().writeCsr(new File(directory, issuedTo.concat(".csr")).getPath(), csrRequest);
             X509Certificate issuedCertificate = authority.signCsrAndGenerateCertificate(csrRequest, issuerKey, issuerCertificate[0], issuedTo);
-            CertificateWriter.getInstance().writeToPem(issuedCertificate, new File(directory, issuedTo.concat(".cer")).getPath());
+            CertificateWriter.getInstance().toPEM(issuedCertificate, new File(directory, issuedTo.concat(".cer")).getPath());
 
             String certificatePath = issuedCertificateFile.getPath();
             Files.deleteIfExists(Paths.get(certificatePath));
