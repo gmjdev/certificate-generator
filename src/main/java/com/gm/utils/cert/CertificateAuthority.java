@@ -43,16 +43,17 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.gm.utils.cert.exception.CertificateCreationException;
 import com.gm.utils.cert.exception.CsrCreationException;
+import com.gm.utils.cert.properties.CertsProperties;
 
 public class CertificateAuthority {
     private static final String CONTENT_SIGNATURE_ALGORITHM = "SHA256withRSA";
     private static final String SUBJECT_NAME_FMT = "{0}-RootCA";
-    @Value("${certs.org-prefix:localhost}")
-    private String org;
+    @Autowired
+    private CertsProperties certProp;
 
     public X509Certificate createRootCaCertificate(KeyPair keyPair, int expiryInDays) {
         final Instant now = Instant.now();
@@ -60,7 +61,7 @@ public class CertificateAuthority {
         final Date notAfter = Date.from(now.plus(Duration.ofDays(expiryInDays)));
 
         try {
-            X500Name x500Name = getSubjectX500Name(MessageFormat.format(SUBJECT_NAME_FMT, org), true);
+            X500Name x500Name = getSubjectX500Name(MessageFormat.format(SUBJECT_NAME_FMT, certProp.getOrgPrefix()), true);
 
             // @formatter:off
             X509v3CertificateBuilder rootCertBuilder = new JcaX509v3CertificateBuilder(x500Name,
@@ -116,7 +117,7 @@ public class CertificateAuthority {
 
         try {
             // set issuer and subject name
-            X500Name issuedToCN = getSubjectX500Name(MessageFormat.format(SUBJECT_NAME_FMT, org.concat("-Intermediate")), true);
+            X500Name issuedToCN = getSubjectX500Name(MessageFormat.format(SUBJECT_NAME_FMT, certProp.getOrgPrefix().concat("-Intermediate")), true);
 
             X509v3CertificateBuilder intermediateCertBuilder = new JcaX509v3CertificateBuilder(issuer, getSerialNumber(), notBefore, notAfter,
                     issuedToCN, keyPair.getPublic());
@@ -202,15 +203,26 @@ public class CertificateAuthority {
     private DERSequence getSubjectAltnativeNames(String commonName) {
         List<ASN1Encodable> sanEntries = new ArrayList<>(10);
 
+        // add default common name entry
         sanEntries.add(new GeneralName(GeneralName.dNSName, commonName));
-        if (commonName.indexOf("accounts.intern") == -1) {
-            sanEntries.add(new GeneralName(GeneralName.dNSName, commonName.concat(".accounts.intern")));
+
+        // add common name entry with domain
+        if (commonName.indexOf(certProp.getSan().getOrgDomain()) == -1) {
+            sanEntries.add(new GeneralName(GeneralName.dNSName, commonName.concat(".").concat(certProp.getSan().getOrgDomain())));
         }
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.accounts.intern"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost.com"));
-        sanEntries.add(new GeneralName(GeneralName.dNSName, "*.localhost.com"));
-        sanEntries.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
+
+        if (certProp.getSan().isIncludeWildCardDomain()) {
+            sanEntries.add(new GeneralName(GeneralName.dNSName, "*." + certProp.getSan().getOrgDomain()));
+        }
+
+        if (certProp.getSan().isIncludeLocalHost()) {
+            sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost"));
+            sanEntries.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
+        }
+        if (certProp.getSan().isIncludeLocalHost() && certProp.getSan().isIncludeWildCardLocalHost()) {
+            sanEntries.add(new GeneralName(GeneralName.dNSName, "localhost.com"));
+            sanEntries.add(new GeneralName(GeneralName.dNSName, "*.localhost.com"));
+        }
 
         return new DERSequence(sanEntries.toArray(new ASN1Encodable[sanEntries.size()]));
     }

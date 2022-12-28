@@ -1,6 +1,7 @@
 package com.gm.utils.cert.util;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Scanner;
 
 import org.apache.commons.lang3.StringUtils;
@@ -33,5 +34,13 @@ public class SystemUtil {
             log.error("Failed to execute command: {}", execCommand, e);
         }
         return "localhost";
+    }
+
+    public static Optional<String> getDefaultJavaHome() {
+        String javaHome = System.getenv("JAVA_HOME");
+        if (StringUtils.isBlank(javaHome)) {
+            javaHome = System.getenv("java.home");
+        }
+        return Optional.ofNullable(javaHome);
     }
 }
