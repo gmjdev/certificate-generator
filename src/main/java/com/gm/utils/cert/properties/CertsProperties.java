@@ -17,4 +17,5 @@ public class CertsProperties {
     private CertificateProperties intermediateCa = new CertificateProperties(2, "intermediateca", phrase);
     private CertificateProperties issuedTo = new CertificateProperties(1, "server", phrase);
     private SanEntries san = new SanEntries("accounts.intern", true, true, true);
+    private String javaHomeVariable = "JAVA_HOME";
 }

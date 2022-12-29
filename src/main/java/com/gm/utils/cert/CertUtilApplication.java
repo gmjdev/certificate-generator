@@ -18,6 +18,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -61,12 +62,27 @@ public class CertUtilApplication {
                 log.info("Creating Certificates...");
                 createCertificate();
                 log.debug("Creation of certificates completed successfully");
+            } else if (args.containsOption("installCertificate") && args.containsOption("certs.javaHomeVariable")) {
+                performCertificateInstallation(args);
             } else if (args.containsOption("installCertificate")) {
-                log.info("Validating server reachability...");
                 certificateInstaller.performHostReachability(args.getOptionValues("host").get(0),
                         Integer.parseInt(args.getOptionValues("port").get(0)));
             }
         };
+    }
+
+    private void performCertificateInstallation(ApplicationArguments args) {
+        log.info("Validating server reachability...");
+        String val = args.getOptionValues("certs.javaHomeVariable").get(0);
+        char[] phrase = args.containsOption("certs.javaKeystorePhrase") ? args.getOptionValues("certs.javaKeystorePhrase").get(0).toCharArray()
+                : Constants.DEFAULT_KEYSTORE_PHRASE;
+        Optional<String> javaHome = SystemUtil.getEnvironmentValue(val);
+        if (!javaHome.isPresent()) {
+            throw new IllegalArgumentException("Unable to get valid java home path provided via variable: " + val);
+        }
+        log.info("Installing certificate using Java home variable as: {} and value: {}", val, javaHome.get());
+        certificateInstaller.performHostReachability(args.getOptionValues("host").get(0), Integer.parseInt(args.getOptionValues("port").get(0)),
+                javaHome.get(), phrase);
     }
 
     private void createRootCaAndWriteToFile(String directory, char[] phrase) {

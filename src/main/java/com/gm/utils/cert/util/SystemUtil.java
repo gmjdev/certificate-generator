@@ -43,4 +43,9 @@ public class SystemUtil {
         }
         return Optional.ofNullable(javaHome);
     }
+
+    public static Optional<String> getEnvironmentValue(String variableName) {
+        String javaHome = System.getenv(variableName);
+        return Optional.ofNullable(javaHome);
+    }
 }
